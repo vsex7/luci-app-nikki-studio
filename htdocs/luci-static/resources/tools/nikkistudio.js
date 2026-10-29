@@ -43,6 +43,8 @@ var KINDS = {
 	proxy_providers: { title: '节点池', map: 'proxy-providers', profile: 'proxy-providers' }
 };
 
+var MAP_KEYS = { 'rule-providers': true, 'proxy-providers': true };
+
 var SECTION_LABEL = {
 	'nikki-proxies': '追加节点（插在订阅节点之前）',
 	'proxies': '替换订阅的全部节点',
@@ -275,7 +277,25 @@ var Session = baseclass.extend({
 	isMixin: function() { return this.target == 'mixin'; },
 	targetLabel: function() { return this.isMixin() ? '混入文件 mixin.yaml' : ('配置文件 ' + this.target.substring(8)); },
 	section: function(k) { return (this.doc.sections || {})[k] || { present: false, readonly: false, locked: false, items: [] }; },
-	items: function(k) { if (this.work[k] == null) this.work[k] = KINDS.providers.map == k ? {} : []; return this.work[k]; },
+	items: function(k) { if (this.work[k] == null) this.work[k] = MAP_KEYS[k] ? {} : []; return this.work[k]; },
+
+	/* map sections (rule-providers / proxy-providers) */
+	map: function(k) {
+		var v = this.items(k);
+		if (v == null || typeof(v) != 'object' || Array.isArray(v)) { v = {}; this.work[k] = v; }
+		return v;
+	},
+	setMapEntry: function(k, name, value, oldName) {
+		var m = this.map(k);
+		if (oldName && oldName !== name) delete m[oldName];
+		m[name] = value;
+		this.touch(k);
+	},
+	deleteMapEntry: function(k, name) {
+		var m = this.map(k);
+		delete m[name];
+		this.touch(k);
+	},
 
 	setItems: function(k, v) {
 		this.work[k] = v;

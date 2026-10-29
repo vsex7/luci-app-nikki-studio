@@ -48,7 +48,11 @@ return view.extend({
 				E('div', { 'class': 'td ns-actions' }, [
 					ns.btn('编辑', 'cbi-button-action', function() { self.edit(name, p); }),
 					ns.btn('删除', 'cbi-button-negative', function() {
-						session.deleteMapEntry(self.sec(), name);
+						var users = session.effective('groups').map(function(e) { return e.v || {}; })
+							.filter(function(g) { return (g.use || []).indexOf(name) >= 0; }).map(function(g) { return g.name; });
+						if (!users.length) return session.deleteMapEntry(self.sec(), name);
+						return ns.confirmDialog('删除节点池', '以下策略组通过 use 引用了「' + name + '」：' + users.join('、') + '。删除后需要同时修改这些策略组，否则校验会失败。确定删除？', '删除', true)
+							.then(function(ok) { if (ok) session.deleteMapEntry(self.sec(), name); });
 					})
 				])
 			]);
@@ -86,7 +90,7 @@ return view.extend({
 		if (!isNew) fName.disabled = true;
 
 		var fType = ns.select(p.type || 'file', [ [ 'file', '本地文件（file）' ], [ 'http', '网络在线订阅（http）' ] ]);
-		var fPath = ns.input(p.path || '/etc/nikki/subscriptions/', { placeholder: '/etc/nikki/subscriptions/xxx.yaml' });
+		var fPath = ns.input(p.path || './proxy_providers/', { placeholder: './proxy_providers/xxx.yaml' });
 		var fUrl = ns.input(p.url || '', { placeholder: 'https://airport.com/api/v1/client/subscribe?token=...' });
 		var fInterval = ns.input(p.interval || 86400, { type: 'number' });
 		
@@ -95,7 +99,8 @@ return view.extend({
 		var fHcUrl = ns.input(hc.url || 'https://www.gstatic.com/generate_204', { placeholder: 'https://www.gstatic.com/generate_204' });
 		var fHcInterval = ns.input(hc.interval || 300, { type: 'number', placeholder: '300' });
 
-		var rowPath = E('div', { 'class': 'ns-row' }, [ E('label', {}, '文件路径'), E('div', { 'class': 'ns-ctl' }, fPath) ]);
+		var rowPath = E('div', { 'class': 'ns-row' }, [ E('label', {}, '文件路径'), E('div', { 'class': 'ns-ctl' }, [ fPath,
+			E('div', { 'class': 'ns-help' }, '相对路径以 /etc/nikki/run 为基准。Mihomo 只允许读取运行目录或 Nikki「安全路径」(env_safe_paths) 中的文件，其他位置会导致校验失败。') ]) ]);
 		var rowUrl = E('div', { 'class': 'ns-row' }, [ E('label', {}, '订阅 URL'), E('div', { 'class': 'ns-ctl' }, fUrl) ]);
 		var rowInterval = E('div', { 'class': 'ns-row' }, [ E('label', {}, '更新间隔(秒)'), E('div', { 'class': 'ns-ctl' }, fInterval) ]);
 
@@ -126,6 +131,10 @@ return view.extend({
 				ns.btn('确定', 'cbi-button-positive', function() {
 					var name = fName.value.trim();
 					if (!name) return ns.notify('节点池标识不能为空', 'danger');
+					if (/[,\s]/.test(name)) return ns.notify('节点池标识不能包含逗号或空格', 'danger');
+					if (isNew && session.proxyProviderNames().indexOf(name) >= 0) return ns.notify('节点池「' + name + '」已存在', 'danger');
+					if (fType.value == 'http' && !/^https?:\/\//.test(fUrl.value.trim())) return ns.notify('请填写有效的订阅 URL', 'danger');
+					if (fType.value == 'file' && !/[^\/]\.ya?ml$|[^\/]\.txt$/.test(fPath.value.trim())) return ns.notify('请填写文件路径（含文件名）', 'danger');
 					
 					var out = Object.assign({}, p);
 					out.type = fType.value;
@@ -150,5 +159,9 @@ return view.extend({
 				})
 			])
 		]);
-	}
+	},
+
+	handleSave: null,
+	handleSaveApply: null,
+	handleReset: null
 });
