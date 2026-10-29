@@ -1,0 +1,10 @@
+proxy-groups:
+  - name: G
+    type: select
+    proxies: [DIRECT]
+rules:
+  - MATCH,G
+rule-providers:
+  cn: {type: http, behavior: domain, format: mrs, url: "https://x/cn.mrs", interval: 86400}
+sniffer:
+  enable: true

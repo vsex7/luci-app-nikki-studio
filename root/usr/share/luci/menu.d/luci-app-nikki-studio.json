@@ -1,0 +1,38 @@
+{
+	"admin/services/nikki-studio": {
+		"title": "Nikki Studio",
+		"order": 61,
+		"action": { "type": "firstchild" },
+		"depends": { "acl": [ "luci-app-nikki-studio" ] }
+	},
+	"admin/services/nikki-studio/overview": {
+		"title": "概览",
+		"order": 10,
+		"action": { "type": "view", "path": "nikki-studio/overview" }
+	},
+	"admin/services/nikki-studio/proxies": {
+		"title": "节点",
+		"order": 20,
+		"action": { "type": "view", "path": "nikki-studio/proxies" }
+	},
+	"admin/services/nikki-studio/groups": {
+		"title": "策略组",
+		"order": 30,
+		"action": { "type": "view", "path": "nikki-studio/groups" }
+	},
+	"admin/services/nikki-studio/rules": {
+		"title": "规则",
+		"order": 40,
+		"action": { "type": "view", "path": "nikki-studio/rules" }
+	},
+	"admin/services/nikki-studio/providers": {
+		"title": "规则集",
+		"order": 50,
+		"action": { "type": "view", "path": "nikki-studio/providers" }
+	},
+	"admin/services/nikki-studio/backup": {
+		"title": "备份与恢复",
+		"order": 60,
+		"action": { "type": "view", "path": "nikki-studio/backup" }
+	}
+}

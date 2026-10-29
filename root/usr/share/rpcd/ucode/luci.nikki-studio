@@ -1,0 +1,219 @@
+// Nikki Studio - rpcd ucode plugin (ubus object: luci.nikki-studio)
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+
+import { access, readfile, writefile, mkdir } from 'fs';
+import * as lib from '/usr/share/nikki-studio/lib.uc';
+
+const JOB_RUNNER = '/usr/libexec/nikki-studio/job.uc';
+
+function start_job(job) {
+	if (lib.lock_held())
+		return { error: 'BUSY', message: '另一个任务正在进行，请稍后再试' };
+	lib.ensure_runtime();
+	const id = lib.uuid();
+	const dir = lib.job_dir(id);
+	mkdir(dir, 0700);
+	job.id = id;
+	job.created = time();
+	writefile(dir + '/job.json', sprintf('%J', job));
+	lib.write_status(id, { id: id, type: job.type, state: 'running', stage: 'queued', started: time() });
+	system('ucode -S ' + lib.shq(JOB_RUNNER) + ' ' + lib.shq(id) + ' </dev/null >/dev/null 2>&1 &');
+	return { job_id: id };
+}
+
+const methods = {
+	get_state: {
+		call: function() {
+			const c = lib.uci_nikki();
+			const src = lib.resolve_source(c);
+			const versions = lib.apk_versions([ 'nikki', 'luci-app-nikki', 'luci-app-nikki-studio' ]);
+			const targets = { mixin: { exists: !!access(lib.MIXIN_FILE), md5: lib.md5(lib.MIXIN_FILE) } };
+			const profiles = lib.list_profiles();
+			const subscriptions = [];
+			c.foreach('nikki', 'subscription', (s) => {
+				push(subscriptions, { id: s['.name'], name: s.name ?? s['.name'] });
+			});
+			const mixin_present = access(lib.MIXIN_FILE) ? (lib.yq_json('(. // {}) as $r | ' + '[' + join(',', map(lib.MIXIN_SECTIONS, (k) => '"' + k + '"')) + '] | map(select(. as $k | $r | has($k)))', lib.MIXIN_FILE).value ?? []) : [];
+			return {
+				versions: { ...versions, mihomo: lib.mihomo_version() },
+				running: lib.nikki_running(),
+				busy: lib.lock_held(),
+				nikki: {
+					enabled: lib.uci_bool(c.get('nikki', 'config', 'enabled')),
+					core_only: lib.uci_bool(c.get('nikki', 'config', 'core_only')),
+					test_profile: lib.uci_bool(c.get('nikki', 'config', 'test_profile')),
+					proxy_enabled: lib.uci_bool(c.get('nikki', 'proxy', 'enabled')),
+					tcp_mode: c.get('nikki', 'proxy', 'tcp_mode') ?? '',
+					udp_mode: c.get('nikki', 'proxy', 'udp_mode') ?? '',
+					mixin_file_content: lib.uci_bool(c.get('nikki', 'mixin', 'mixin_file_content')),
+					luci_rule: lib.uci_bool(c.get('nikki', 'mixin', 'rule')),
+					luci_rule_provider: lib.uci_bool(c.get('nikki', 'mixin', 'rule_provider')),
+				},
+				source: src,
+				profiles: profiles,
+				subscriptions: subscriptions,
+				targets: targets,
+				mixin_sections: mixin_present,
+				luci_rules: lib.luci_rules(c),
+				luci_rule_providers: lib.luci_rule_providers(c),
+				env: lib.environment(c),
+			};
+		}
+	},
+
+	load_doc: {
+		args: { target: 'target' },
+		call: function(req) {
+			return lib.load_doc(req.args?.target);
+		}
+	},
+
+	load_source: {
+		call: function() {
+			const c = lib.uci_nikki();
+			const src = lib.resolve_source(c);
+			if (src.error)
+				return { error: src.error, source: src };
+			if (!src.exists)
+				return { error: 'SOURCE_MISSING', source: src };
+			const r = lib.load_source_summary(src.path);
+			if (r.error)
+				return { error: 'PARSE_FAILED', detail: r.error, source: src };
+			return { source: src, ...r.value };
+		}
+	},
+
+	validate: {
+		args: { target: 'target', patch: {} },
+		call: function(req) {
+			if (!lib.resolve_target(req.args?.target))
+				return { error: 'BAD_TARGET' };
+			return start_job({ type: 'validate', target: req.args.target, patch: req.args.patch ?? {} });
+		}
+	},
+
+	save: {
+		args: { target: 'target', base_md5: 'base_md5', patch: {}, job_id: 'job_id', restart: true, note: 'note' },
+		call: function(req) {
+			const a = req.args ?? {};
+			if (!lib.resolve_target(a.target))
+				return { error: 'BAD_TARGET' };
+			return start_job({ type: 'save', target: a.target, base_md5: a.base_md5 ?? '', patch: a.patch ?? {}, reuse_job: a.job_id, restart: !!a.restart, note: a.note ?? '' });
+		}
+	},
+
+	restore_backup: {
+		args: { name: 'name', restart: true },
+		call: function(req) {
+			if (!match(req.args?.name ?? '', lib.BACKUP_RE) || !access(lib.BACKUP_DIR + '/' + req.args.name))
+				return { error: 'BAD_NAME' };
+			return start_job({ type: 'restore', name: req.args.name, restart: !!req.args.restart });
+		}
+	},
+
+	job_status: {
+		args: { job_id: 'job_id' },
+		call: function(req) {
+			const id = req.args?.job_id;
+			if (!lib.valid_job_id(id))
+				return { error: 'BAD_JOB' };
+			const st = lib.read_status(id);
+			if (!st)
+				return { error: 'NO_JOB' };
+			// detect crashed runner
+			if (st.state == 'running' && st.pid && !access('/proc/' + st.pid) && (time() - (st.started ?? 0)) > 5) {
+				st.state = 'done';
+				st.result = { ok: false, stage: st.stage, message: '后台任务意外终止' };
+				lib.lock_release();
+			}
+			return st;
+		}
+	},
+
+	diff: {
+		args: { target: 'target', patch: {} },
+		call: function(req) {
+			const t = lib.resolve_target(req.args?.target);
+			if (!t)
+				return { error: 'BAD_TARGET' };
+			lib.ensure_runtime();
+			const dir = lib.RUNTIME_DIR + '/diff';
+			if (!access(dir))
+				mkdir(dir, 0700);
+			const cand = lib.build_candidate(t, req.args.patch ?? {}, dir);
+			if (cand.error)
+				return { error: cand.error, detail: cand.detail };
+			return { before: access(t.path) ? (readfile(t.path) ?? '') : '', after: readfile(cand.path) ?? '' };
+		}
+	},
+
+	list_backups: {
+		args: { target: 'target' },
+		call: function(req) {
+			return { backups: lib.list_backups(req.args?.target || null) };
+		}
+	},
+
+	read_backup: {
+		args: { name: 'name' },
+		call: function(req) {
+			const n = req.args?.name ?? '';
+			if (!match(n, lib.BACKUP_RE))
+				return { error: 'BAD_NAME' };
+			const content = readfile(lib.BACKUP_DIR + '/' + n);
+			if (content == null)
+				return { error: 'NOT_FOUND' };
+			const m = match(n, lib.BACKUP_RE);
+			const target = lib.label_target(m[3]);
+			const t = lib.resolve_target(target);
+			return { name: n, target: target, content: content, current: (t && access(t.path)) ? (readfile(t.path) ?? '') : '' };
+		}
+	},
+
+	set_mixin_file: {
+		args: { enabled: true },
+		call: function(req) {
+			const c = lib.uci_nikki();
+			c.set('nikki', 'mixin', 'mixin_file_content', req.args?.enabled ? '1' : '0');
+			const ok = c.commit('nikki');
+			return { success: !!ok };
+		}
+	},
+
+	to_json: {
+		args: { yaml: 'yaml' },
+		call: function(req) {
+			const y = req.args?.yaml ?? '';
+			if (length(y) > 1024 * 1024)
+				return { error: 'TOO_LARGE' };
+			lib.ensure_runtime();
+			const f = sprintf('%s/.snippet.%d.yaml', lib.RUNTIME_DIR, lib.getpid());
+			writefile(f, y);
+			const r = lib.yq_json('explode(.)', f);
+			system([ 'rm', '-f', f ]);
+			if (r.error)
+				return { error: 'PARSE_FAILED', detail: r.error };
+			return { value: r.value };
+		}
+	},
+
+	delay: {
+		args: { name: 'name', url: 'url', timeout: 5000 },
+		call: function(req) {
+			const name = req.args?.name ?? '';
+			const url = req.args?.url ?? '';
+			let timeout = +(req.args?.timeout ?? 5000);
+			if (!match(name, /^[A-Za-z0-9%._~-]+$/) || !match(url, /^[A-Za-z0-9%._~-]+$/))
+				return { error: 'BAD_ARGS' };
+			if (!(timeout > 0 && timeout <= 15000))
+				timeout = 5000;
+			const r = lib.api_get('/proxies/' + name + '/delay?timeout=' + timeout + '&url=' + url, timeout / 1000 + 2);
+			if (r.error)
+				return r;
+			return r.value ?? {};
+		}
+	},
+};
+
+return { 'luci.nikki-studio': methods };

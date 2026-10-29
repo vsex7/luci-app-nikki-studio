@@ -1,0 +1,10 @@
+# 我的混入
+nikki-proxies:
+  # 自建
+  - {name: "🏠 Home", type: ss, server: 1.2.3.4, port: 8388, cipher: aes-256-gcm, password: "p@ss: word"}
+nikki-rules:
+  - DOMAIN-SUFFIX,example.com,DIRECT # inline comment
+  - "AND,((DOMAIN,a.com),(NETWORK,UDP)),REJECT"
+  - 'OR,((DOMAIN-KEYWORD,ads),(GEOSITE,category-ads-all)),REJECT'
+dns:
+  enable: true   # keep me

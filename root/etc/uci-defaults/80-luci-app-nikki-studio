@@ -1,0 +1,13 @@
+#!/bin/sh
+# Nikki Studio post-install
+
+mkdir -p /etc/nikki-studio/backups
+chmod 0700 /etc/nikki-studio /etc/nikki-studio/backups
+
+# keep backups across sysupgrade
+grep -qxF '/etc/nikki-studio/' /etc/sysupgrade.conf 2>/dev/null || echo '/etc/nikki-studio/' >> /etc/sysupgrade.conf
+
+rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache 2>/dev/null
+/etc/init.d/rpcd reload 2>/dev/null
+
+exit 0

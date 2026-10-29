@@ -1,0 +1,7 @@
+base: &base {type: ss, cipher: aes-128-gcm, password: x, port: 1}
+nikki-proxies:
+  - <<: *base
+    name: A
+    server: a.com
+nikki-rules:
+  - MATCH,DIRECT

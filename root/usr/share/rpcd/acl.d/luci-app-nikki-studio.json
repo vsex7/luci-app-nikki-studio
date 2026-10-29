@@ -1,0 +1,15 @@
+{
+	"luci-app-nikki-studio": {
+		"description": "Grant access to Nikki Studio",
+		"read": {
+			"ubus": {
+				"luci.nikki-studio": [ "get_state", "load_doc", "load_source", "job_status", "diff", "list_backups", "read_backup", "to_json", "delay" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"luci.nikki-studio": [ "validate", "save", "restore_backup", "set_mixin_file" ]
+			}
+		}
+	}
+}
