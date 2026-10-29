@@ -25,6 +25,11 @@
 		"order": 40,
 		"action": { "type": "view", "path": "nikki-studio/rules" }
 	},
+		"admin/services/nikki-studio/proxy_providers": {
+		"title": "节点池",
+		"order": 55,
+		"action": { "type": "view", "path": "nikki-studio/proxy_providers" }
+	},
 	"admin/services/nikki-studio/providers": {
 		"title": "规则集",
 		"order": 50,

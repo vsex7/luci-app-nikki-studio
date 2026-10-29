@@ -39,7 +39,8 @@ var KINDS = {
 	proxies: { title: '节点', prepend: 'nikki-proxies', replace: 'proxies', profile: 'proxies' },
 	groups: { title: '策略组', prepend: 'nikki-proxy-groups', replace: 'proxy-groups', profile: 'proxy-groups' },
 	rules: { title: '规则', prepend: 'nikki-rules', replace: 'rules', profile: 'rules' },
-	providers: { title: '规则集', map: 'rule-providers', profile: 'rule-providers' }
+	providers: { title: '规则集', map: 'rule-providers', profile: 'rule-providers' },
+	proxy_providers: { title: '节点池', map: 'proxy-providers', profile: 'proxy-providers' }
 };
 
 var SECTION_LABEL = {
@@ -49,7 +50,8 @@ var SECTION_LABEL = {
 	'proxy-groups': '替换订阅的全部策略组',
 	'nikki-rules': '追加规则（优先于订阅规则）',
 	'rules': '替换订阅的全部规则',
-	'rule-providers': '规则集（与订阅中的规则集合并）'
+	'rule-providers': '规则集（与订阅中的规则集合并）',
+	'proxy-providers': '节点池订阅（proxy-providers，动态挂载机场）'
 };
 
 var CSS = [
@@ -361,7 +363,13 @@ var Session = baseclass.extend({
 		return Object.keys(names);
 	},
 
-	proxyProviderNames: function() { return (this.source || {}).proxy_providers || []; },
+	proxyProviderNames: function() {
+		var fromSrc = (this.source || {}).proxy_providers || [];
+		var fromDoc = Object.keys(this.map('proxy-providers') || {});
+		var set = {};
+		fromSrc.concat(fromDoc).forEach(function(k) { if (k) set[k] = true; });
+		return Object.keys(set);
+	},
 	subRuleNames: function() { return (this.source || {}).sub_rules || []; },
 
 	reload: function() {

@@ -21,7 +21,7 @@ var FILTER_PRESETS = [
 	[ '(?i)德国|DE|Germany|🇩🇪', '德国' ]
 ];
 var EXCLUDE_PRESET = '(?i)剩余|到期|官网|流量|套餐|重置|过期|expire|traffic|reset';
-var GROUP_EMOJI = [ '🚀', '🧑‍💻', '🤖', '🎬', '📺', '🎮', '🍎', 'Ⓜ️', '📲', '🌍', '🇭🇰', '🇯🇵', '🇺🇸', '🇸🇬', '🎯', '🛑', '🐟' ];
+var GROUP_EMOJI = [ '🚀', '⚡', '🧑‍💻', '🤖', '🌟', '🪙', '💻', '🎬', '📺', '🎮', '🍎', 'Ⓜ️', '📲', '🌍', '🇭🇰', '🇯🇵', '🇺🇸', '🇸🇬', '🇹🇼', '🇬🇧', '🎯', '🛑', '🐟' ];
 
 return view.extend({
 	load: function() { return ns.load(); },

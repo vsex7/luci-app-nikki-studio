@@ -31,9 +31,9 @@ export const LOCK_STALE = 300;
 export const MERGE_CORE = '.proxies = .nikki-proxies + .proxies | del(.nikki-proxies) | .proxy-groups = .nikki-proxy-groups + .proxy-groups | del(.nikki-proxy-groups) | .rules = .nikki-rules + .rules | del(.nikki-rules) | explode(.)';
 export const MERGE_EXPR = '... comments="" | . as $item ireduce ({}; . * $item ) | ' + MERGE_CORE;
 
-export const MIXIN_SECTIONS = [ 'proxies', 'nikki-proxies', 'proxy-groups', 'nikki-proxy-groups', 'rules', 'nikki-rules', 'rule-providers' ];
-export const PROFILE_SECTIONS = [ 'proxies', 'proxy-groups', 'rules', 'rule-providers' ];
-export const MAP_SECTIONS = { 'rule-providers': true };
+export const MIXIN_SECTIONS = [ 'proxies', 'nikki-proxies', 'proxy-groups', 'nikki-proxy-groups', 'rules', 'nikki-rules', 'rule-providers', 'proxy-providers' ];
+export const PROFILE_SECTIONS = [ 'proxies', 'proxy-groups', 'rules', 'rule-providers', 'proxy-providers' ];
+export const MAP_SECTIONS = { 'rule-providers': true, 'proxy-providers': true };
 
 // UCI overwrite switches -> yq delete expression (see /etc/init.d/nikki)
 export const OVERWRITES = [
@@ -391,6 +391,18 @@ export function merge_logic_ok() {
 
 export function environment(c) {
 	const rel = openwrt_release();
+	const companion_scripts = [];
+	if (access('/etc/nikki/scripts/rotate_opencode.sh')) {
+		let p_cr = popen('grep -q "rotate_opencode" /etc/crontabs/root 2>/dev/null && echo "active" || echo "idle"');
+		let cr_st = trim(p_cr.read('all'));
+		p_cr.close();
+		push(companion_scripts, {
+			name: 'OpenCode 每小时自动轮询',
+			path: '/etc/nikki/scripts/rotate_opencode.sh',
+			cron: cr_st == 'active',
+			status: cr_st == 'active' ? '定时激活 (整点轮换)' : '已安装但未挂载 Cron'
+		});
+	}
 	const kmods = {};
 	for (let m in [ 'inet_diag', 'nft_socket', 'nft_tproxy', 'tun' ])
 		kmods[m] = !!access('/sys/module/' + m);
@@ -420,6 +432,7 @@ export function environment(c) {
 		conflicts: conflicts,
 		dns_redirect: dns_redirect,
 		merge_logic_ok: merge_logic_ok(),
+		companion_scripts: companion_scripts,
 	};
 };
 
@@ -860,7 +873,7 @@ export function validate(target, patch, workdir, progress) {
 			return fail('nikki_check', 'TCP 代理模式为 Redirect，但配置中没有 redir-port 或对应的 listener');
 		if ((tcp_mode == 'tproxy' || udp_mode == 'tproxy') && yq_test('(has("tproxy-port") or (has("listeners") and .listeners | any_c(.name == "' + q(tl) + '" and .type == "tproxy"))) | not', final))
 			return fail('nikki_check', '代理模式为 TPROXY，但配置中没有 tproxy-port 或对应的 listener');
-		if ((tcp_mode == 'tun' || udp_mode == 'tun') && yq_test('(has("tun") and (.tun | .enable) and (.tun | has("device"))) or (has("listeners") and .listeners | any_c(.name == "' + q(ul) + '" and .type == "tun" and has("device"))) | not', final))
+		if ((tcp_mode == 'tun' || udp_mode == 'tun') && yq_test('((has("tun") and (.tun | .enable) and (.tun | has("device"))) or (has("listeners") and .listeners | any_c(.name == "' + q(ul) + '" and .type == "tun" and has("device")))) | not', final))
 			return fail('nikki_check', '代理模式为 TUN，但配置中 TUN 未启用或未设置 device');
 	}
 

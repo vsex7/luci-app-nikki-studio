@@ -77,7 +77,10 @@ return view.extend({
 				E('span', {}, '已使用的混入段'), E('span', {}, (st.mixin_sections || []).length ? st.mixin_sections.join('、') : '无'),
 				E('span', {}, '版本'), E('span', {}, [ 'nikki ' + (v.nikki || '?'), ' · luci-app-nikki ' + (v['luci-app-nikki'] || '?'), ' · mihomo ' + (v.mihomo || '?'), ' · nikki-studio ' + (v['luci-app-nikki-studio'] || '?') ]),
 				E('span', {}, '系统'), E('span', {}, env.description || env.release || '?'),
-				E('span', {}, '内核模块'), E('span', {}, Object.keys(env.kmods || {}).map(function(k) { return yesno(env.kmods[k], k, k + ' 缺失', true); }))
+				E('span', {}, '内核模块'), E('span', {}, Object.keys(env.kmods || {}).map(function(k) { return yesno(env.kmods[k], k, k + ' 缺失', true); })),
+				E('span', {}, '外部扩展脚本'), E('span', {}, (env.companion_scripts && env.companion_scripts.length) ? env.companion_scripts.map(function(s) {
+					return E('span', { 'class': 'ns-badge ok', 'style': 'margin-right:.5em' }, s.name + ' (' + s.status + ')');
+				}) : ns.badge('无扩展脚本', 'info'))
 			])
 		]));
 

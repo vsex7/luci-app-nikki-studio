@@ -71,6 +71,14 @@ function parseRule(str) {
 }
 
 function formatRule(r) {
+	if (r.type == 'AND' || r.type == 'OR' || r.type == 'NOT') {
+		// Preserve nested logical structure without losing parentheses
+		var p = r.payload;
+		if (p && !p.startsWith('(')) p = '(' + p + ')';
+		var parts = [ r.type, p, r.target ];
+		(r.options || []).forEach(function(o) { if (o) parts.push(o); });
+		return parts.join(',');
+	}
 	var parts = [ r.type ];
 	if (r.type != 'MATCH') parts.push(r.payload);
 	parts.push(r.target);
