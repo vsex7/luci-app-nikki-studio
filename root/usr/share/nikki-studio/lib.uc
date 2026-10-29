@@ -358,6 +358,8 @@ export function apk_versions(names) {
 				res[n] = m[1];
 		}
 	}
+	if (!res['luci-app-nikki-studio'])
+		res['luci-app-nikki-studio'] = '1.0.0-git';
 	return res;
 };
 
