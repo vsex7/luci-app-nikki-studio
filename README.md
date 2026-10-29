@@ -44,7 +44,8 @@
 ## 安装
 
 ```sh
-# 上传 apk 到路由器后
+# 从 Releases 下载 apk 并上传到路由器后
+# https://github.com/vsex7/luci-app-nikki-studio/releases
 apk add --allow-untrusted ./luci-app-nikki-studio-1.0.0-r1.apk
 ```
 
@@ -73,7 +74,7 @@ apk add --allow-untrusted ./luci-app-nikki-studio-1.0.0-r1.apk
 
 ```sh
 # 在 OpenWrt 25.12 SDK 中
-git clone <本仓库> package/luci-app-nikki-studio
+git clone https://github.com/vsex7/luci-app-nikki-studio.git package/luci-app-nikki-studio
 ./scripts/feeds update luci && ./scripts/feeds install luci-base
 make defconfig
 make package/luci-app-nikki-studio/compile V=s
